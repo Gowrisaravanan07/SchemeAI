@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: schemewise-ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/schemewise-application
+    volumes:
+      - ./ai-service:/app
+    restart: unless-stopped
+    networks:
+      - schemewise-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: schemewise-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+    networks:
+      - schemewise-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: schemewise-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+    networks:
+      - schemewise-network
+
+networks:
+  schemewise-network:
+    driver: bridge
+
+volumes:
+  n8n_data:
